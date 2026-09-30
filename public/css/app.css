@@ -1,0 +1,170 @@
+/* Warung Sembako POS - Custom Stylesheet */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+:root {
+    --primary: #1e3a8a;
+    --primary-dark: #172554;
+    --primary-light: #dbe6f5;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.font-mono-receipt {
+    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
+}
+
+/* Scrollbar aesthetic */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Realistic Thermal Receipt Paper Preview */
+.receipt-paper {
+    background: #ffffff;
+    box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+    position: relative;
+    border-radius: 8px 8px 0 0;
+    transition: all 0.2s ease;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+}
+
+.receipt-paper::after {
+    content: "";
+    position: absolute;
+    bottom: -12px;
+    left: -1px;
+    right: -1px;
+    height: 12px;
+    background: linear-gradient(135deg, transparent 50%, #ffffff 50%),
+                linear-gradient(225deg, transparent 50%, #ffffff 50%);
+    background-size: 16px 16px;
+    background-repeat: repeat-x;
+    filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.05));
+}
+
+.receipt-dotted-line {
+    border-top: 1px dashed #cbd5e1;
+    margin: 8px 0;
+}
+
+.receipt-double-line {
+    border-top: 2px dashed #94a3b8;
+    margin: 8px 0;
+}
+
+/* Active touch states */
+.active-press:active {
+    transform: scale(0.98);
+}
+
+/* Glassmorphism modal backdrop */
+.modal-backdrop-blur {
+    backdrop-filter: blur(4px);
+    background-color: rgba(15, 23, 42, 0.6);
+}
+
+/* Thermal printer status badge pulse */
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.1); }
+}
+
+.pulse-connected {
+    animation: pulse-dot 2s infinite ease-in-out;
+}
+
+/* Print only styles */
+@media print {
+    @page {
+        size: auto;
+        margin: 0;
+    }
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .thermal-print-container {
+        width: 100% !important;
+        max-width: 58mm !important;
+        margin: 0 auto !important;
+        padding: 2mm 3mm !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+    .thermal-print-container.paper-80mm {
+        max-width: 80mm !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+}
+
+/* Camera Barcode Scanner Viewfinder & Laser Animations */
+@keyframes laser-sweep {
+    0% {
+        top: 8px;
+        opacity: 0.8;
+    }
+    50% {
+        top: calc(100% - 10px);
+        opacity: 1;
+    }
+    100% {
+        top: 8px;
+        opacity: 0.8;
+    }
+}
+
+.animate-laser {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    animation: laser-sweep 2.2s ease-in-out infinite;
+}
+
+#camera-reader-viewport video {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 52vh !important;
+    object-fit: cover !important;
+    border-radius: 1rem;
+}
+
+/* Mobile Responsive Compact Optimizations */
+@media (max-width: 640px) {
+    /* Prevent oversized input styles and improve touch ergonomics */
+    input[type="text"],
+    input[type="number"],
+    input[type="url"],
+    input[type="search"],
+    select,
+    textarea {
+        font-size: 13px;
+    }
+
+    /* Modal dialogs always have clean margins and never touch screen borders */
+    .modal-backdrop-blur > div {
+        max-height: 88vh;
+        margin: auto;
+    }
+}
+

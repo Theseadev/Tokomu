@@ -1,0 +1,13 @@
+{
+    "name": "warung/pos",
+    "description": "Sistem POS Warung Sembako dengan Integrasi Thermal Printer",
+    "type": "project",
+    "require": {
+        "flightphp/core": "^3.19"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    }
+}

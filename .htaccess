@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# 1. Protect sensitive internal directories
+RewriteRule ^(app|views|data|vendor)/ - [F,L]
+
+# 2. Block direct downloads of database and config files
+RewriteRule \.(db|sqlite|sqlite3|env|lock)$ - [F,L]
+RewriteRule ^start-pos\.bat$ - [F,L]
+
+# 3. Route everything else through index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
