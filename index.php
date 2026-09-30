@@ -31,6 +31,20 @@ Auth::init();
 Flight::set('flight.views.path', __DIR__ . '/views');
 Flight::set('flight.views.extension', '.php');
 
+// Register Error Handler for friendly messages on Cloud Hosting
+Flight::map('error', function(\Throwable $ex) {
+    http_response_code(500);
+    $isJson = (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
+              || (isset($_SERVER['REQUEST_URI']) && str_contains($_SERVER['REQUEST_URI'], '/api/'));
+    if ($isJson) {
+        header('Content-Type: application/json');
+        echo json_encode(['error' => true, 'message' => $ex->getMessage()]);
+    } else {
+        echo "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Kendala Sistem - Tokomu</title><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-900 text-white min-h-screen flex items-center justify-center p-4'><div class='max-w-md w-full bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl text-center space-y-4'><div class='w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto text-2xl font-bold'>!</div><h1 class='text-lg font-bold'>Terjadi Kendala Sistem</h1><p class='text-sm text-slate-400'>" . htmlspecialchars($ex->getMessage()) . "</p><div class='pt-2'><a href='/' class='inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold transition'>Kembali ke Beranda</a></div></div></body></html>";
+    }
+    exit;
+});
+
 // Helper to render page inside layout
 function renderPage(string $view, array $data = [], string $title = 'Warung Sembako POS', string $activeNav = 'pos'): void {
     if (!Auth::check()) {
