@@ -190,13 +190,13 @@ CREATE TABLE IF NOT EXISTS `stock_logs` (
 
 -- Store #1 (Tokomu / tokomu123)
 INSERT INTO `stores` (`id`, `username`, `password_hash`, `plain_password`, `store_name`, `store_tagline`, `store_address`, `store_phone`, `receipt_header`, `receipt_footer`, `paper_size`, `printer_type`, `auto_print`)
-VALUES (1, 'tokomu', '$2y$10$f6zJc.T5rD6pQ1bIqN6q1.kE54wN92XJ72E8E6sV10XwX96xR9ZgS', 'tokomu123', 'Tokomu', 'Lengkap, Murah & Bersahabat', 'Jl. Pemajatan Komp. Permata Hijau 2, Blok B No.2', '0812-3456-7890', 'STRUK BELANJA', 'Terima kasih telah berbelanja di Tokomu!\nBarang yang sudah dibeli tidak dapat ditukar.', '58mm', 'bluetooth', 1)
-ON DUPLICATE KEY UPDATE `store_name`=VALUES(`store_name`);
+VALUES (1, 'tokomu', '$2y$10$BLvglr9gPkohMaGrW6t/BeAerdNPaiYA0dWE4iD2J196Vv2h6V.D2', 'tokomu123', 'Tokomu', 'Lengkap, Murah & Bersahabat', 'Jl. Pemajatan Komp. Permata Hijau 2, Blok B No.2', '0812-3456-7890', 'STRUK BELANJA', 'Terima kasih telah berbelanja di Tokomu!\nBarang yang sudah dibeli tidak dapat ditukar.', '58mm', 'bluetooth', 1)
+ON DUPLICATE KEY UPDATE `password_hash`=VALUES(`password_hash`), `store_name`=VALUES(`store_name`);
 
 -- Super Administrator (superadmin / admin123)
 INSERT INTO `super_admins` (`id`, `username`, `password_hash`, `name`)
-VALUES (1, 'superadmin', '$2y$10$k1pWwL.0mC5W4sJqX9QW5e6K54wN92XJ72E8E6sV10XwX96xR9ZgS', 'Super Administrator')
-ON DUPLICATE KEY UPDATE `name`=VALUES(`name`);
+VALUES (1, 'superadmin', '$2y$10$rJfPcx/O4MZWzmV.hGfodOTvMRIwhTszAr4vBi3nt7NLdAOw39Lbm', 'Super Administrator')
+ON DUPLICATE KEY UPDATE `password_hash`=VALUES(`password_hash`), `name`=VALUES(`name`);
 
 -- Settings Record
 INSERT INTO `settings` (`id`, `store_name`, `store_tagline`, `store_address`, `store_phone`, `receipt_header`, `receipt_footer`, `paper_size`, `printer_type`, `auto_print`)
