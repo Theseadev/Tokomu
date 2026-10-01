@@ -1,6 +1,7 @@
 /**
- * Camera Barcode Scanner Controller
- * Uses html5-qrcode library for real-time mobile camera barcode detection (EAN-13, UPC, Code-128, QR)
+ * Camera Barcode Scanner Controller (Optimized for Fast Auto-Focus & Macro Barcodes)
+ * Uses html5-qrcode library with native hardware BarcodeDetector, continuous auto-focus,
+ * tap-to-focus, and optical/digital zoom presets (1x, 1.5x, 2x, 2.5x).
  */
 
 class CameraScannerController {
@@ -9,6 +10,7 @@ class CameraScannerController {
         this.isScanning = false;
         this.cameras = [];
         this.currentCameraIndex = 0;
+        this.videoTrack = null;
         this.torchOn = false;
         this.continuous = true;
         this.isCooldown = false;
@@ -16,6 +18,10 @@ class CameraScannerController {
         this.lastScanTime = 0;
         this.onScanCallback = null;
         this.options = {};
+        this.currentZoom = 1.5;
+        this.supportsHardwareZoom = false;
+        this.touchDistanceStart = 0;
+        this.zoomStart = 1.0;
     }
 
     async init() {
@@ -74,25 +80,47 @@ class CameraScannerController {
 
         this.html5QrCode = new Html5Qrcode('camera-reader-viewport');
 
-        // Get available cameras
+        // 1. Get available cameras
         try {
-            this.cameras = await Html5Qrcode.getCameras();
+            const rawCameras = await Html5Qrcode.getCameras();
+            if (rawCameras && rawCameras.length > 0) {
+                // Filter and prioritize standard back/rear camera (skip ultra-wide or front if possible)
+                this.cameras = rawCameras.sort((a, b) => {
+                    const labelA = (a.label || '').toLowerCase();
+                    const labelB = (b.label || '').toLowerCase();
+                    const isBackA = labelA.includes('back') || labelA.includes('rear') || labelA.includes('environment') || labelA.includes('0, facing back');
+                    const isBackB = labelB.includes('back') || labelB.includes('rear') || labelB.includes('environment') || labelB.includes('0, facing back');
+                    const isWideA = labelA.includes('wide') || labelA.includes('ultra');
+                    const isWideB = labelB.includes('wide') || labelB.includes('ultra');
+
+                    if (isBackA && !isBackB) return -1;
+                    if (!isBackA && isBackB) return 1;
+                    if (!isWideA && isWideB) return -1;
+                    if (isWideA && !isWideB) return 1;
+                    return 0;
+                });
+            } else {
+                this.cameras = [];
+            }
         } catch (e) {
             console.warn('Could not enumerate cameras, falling back to facingMode:', e);
             this.cameras = [];
         }
 
-        // Configuration
+        // 2. High-precision Barcode Configuration
         const config = {
-            fps: 15,
+            fps: 24, // High framerate minimizes hand-shake motion blur
             qrbox: (viewfinderWidth, viewfinderHeight) => {
-                // Wide rectangle tailored for 1D retail barcodes (EAN-13/UPC)
-                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                const width = Math.min(300, Math.floor(viewfinderWidth * 0.85));
-                const height = Math.min(180, Math.floor(width * 0.6));
+                // Generous wide rectangle matching retail barcodes (EAN-13, UPC, Code-128, QR)
+                const width = Math.min(380, Math.floor(viewfinderWidth * 0.92));
+                const height = Math.min(220, Math.floor(width * 0.62));
                 return { width, height };
             },
             aspectRatio: 1.0,
+            disableFlip: false,
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true // Native hardware acceleration (10x faster & sharper)
+            },
             formatsToSupport: [
                 Html5QrcodeSupportedFormats.EAN_13,
                 Html5QrcodeSupportedFormats.EAN_8,
@@ -104,17 +132,27 @@ class CameraScannerController {
             ]
         };
 
-        // Select camera or facingMode
-        let cameraParam = { facingMode: 'environment' };
+        // 3. HD Video Constraints with Continuous Auto-Focus
+        let cameraParam = {
+            facingMode: { ideal: 'environment' },
+            focusMode: { ideal: 'continuous' },
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 }
+        };
+
         if (this.cameras && this.cameras.length > 0) {
-            // Prefer rear/environment camera
             if (this.currentCameraIndex >= this.cameras.length) {
                 this.currentCameraIndex = 0;
             }
-            cameraParam = this.cameras[this.currentCameraIndex].id;
+            cameraParam = {
+                deviceId: { exact: this.cameras[this.currentCameraIndex].id },
+                focusMode: { ideal: 'continuous' },
+                width: { min: 640, ideal: 1280, max: 1920 },
+                height: { min: 480, ideal: 720, max: 1080 }
+            };
         }
 
-        // Start scanning stream
+        // 4. Start scanning stream
         await this.html5QrCode.start(
             cameraParam,
             config,
@@ -122,7 +160,7 @@ class CameraScannerController {
                 this.handleDecoded(decodedText);
             },
             (errorMessage) => {
-                // Parse errors are normal for each non-barcode frame, suppress
+                // Ignore per-frame decode misses
             }
         );
 
@@ -130,11 +168,186 @@ class CameraScannerController {
         this.torchOn = false;
         this.updateTorchUI();
 
+        // 5. Inspect and configure active MediaStreamTrack
+        const video = document.querySelector('#camera-reader-viewport video');
+        if (video && video.srcObject) {
+            const tracks = video.srcObject.getVideoTracks();
+            if (tracks && tracks.length > 0) {
+                this.videoTrack = tracks[0];
+                await this.applyContinuousFocus();
+                this.initZoomAndPinch(video);
+            }
+        }
+
         // Check if camera switch button should be visible
         const btnSwitch = document.getElementById('btn-camera-switch');
         if (btnSwitch) {
             btnSwitch.classList.toggle('hidden', this.cameras.length <= 1);
         }
+    }
+
+    async applyContinuousFocus() {
+        if (!this.videoTrack) return;
+        try {
+            const caps = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
+            if (caps.focusMode && caps.focusMode.includes('continuous')) {
+                await this.videoTrack.applyConstraints({
+                    advanced: [{ focusMode: 'continuous' }]
+                });
+            }
+        } catch (e) {
+            console.warn('Continuous focus error:', e);
+        }
+    }
+
+    async refocus() {
+        // Visual focus ring in center of viewfinder
+        const container = document.getElementById('camera-reader-viewport');
+        if (container) {
+            const rect = container.getBoundingClientRect();
+            this.showFocusRing(rect.width / 2, rect.height / 2);
+        }
+
+        if (!this.videoTrack) return;
+        try {
+            const caps = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
+            if (caps.focusMode) {
+                // Cycle focus mode to trigger immediate hardware lens recalibration
+                await this.videoTrack.applyConstraints({
+                    advanced: [{ focusMode: 'single-shot' }]
+                }).catch(() => {});
+                await new Promise(r => setTimeout(r, 90));
+                await this.videoTrack.applyConstraints({
+                    advanced: [{ focusMode: 'continuous' }]
+                }).catch(() => {});
+            }
+        } catch (err) {
+            console.warn('Refocus constraint failed:', err);
+        }
+    }
+
+    handleTapToFocus(e) {
+        const container = document.getElementById('camera-reader-viewport');
+        if (!container) return;
+
+        const rect = container.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : null);
+
+        if (clientX !== null && clientY !== null) {
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+            this.showFocusRing(x, y);
+        }
+
+        this.refocus();
+    }
+
+    showFocusRing(x, y) {
+        const container = document.getElementById('camera-reader-viewport');
+        if (!container) return;
+
+        // Remove old rings
+        const oldRings = container.querySelectorAll('.camera-focus-ring');
+        oldRings.forEach(r => r.remove());
+
+        const ring = document.createElement('div');
+        ring.className = 'camera-focus-ring';
+        ring.style.left = `${x}px`;
+        ring.style.top = `${y}px`;
+        container.appendChild(ring);
+
+        setTimeout(() => ring.remove(), 850);
+    }
+
+    initZoomAndPinch(video) {
+        const caps = this.videoTrack?.getCapabilities ? this.videoTrack.getCapabilities() : {};
+        this.supportsHardwareZoom = !!caps.zoom;
+
+        // Setup pinch-to-zoom on touch devices
+        const viewport = document.getElementById('camera-reader-viewport');
+        if (viewport && !viewport._pinchBound) {
+            viewport._pinchBound = true;
+            viewport.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    this.touchDistanceStart = Math.hypot(
+                        e.touches[0].pageX - e.touches[1].pageX,
+                        e.touches[0].pageY - e.touches[1].pageY
+                    );
+                    this.zoomStart = this.currentZoom;
+                }
+            }, { passive: true });
+
+            viewport.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2 && this.touchDistanceStart > 0) {
+                    const dist = Math.hypot(
+                        e.touches[0].pageX - e.touches[1].pageX,
+                        e.touches[0].pageY - e.touches[1].pageY
+                    );
+                    const ratio = dist / this.touchDistanceStart;
+                    const target = Math.min(3.0, Math.max(1.0, this.zoomStart * ratio));
+                    this.setZoom(parseFloat(target.toFixed(1)));
+                }
+            }, { passive: true });
+
+            viewport.addEventListener('touchend', () => {
+                this.touchDistanceStart = 0;
+            }, { passive: true });
+        }
+
+        // Apply 1.5x zoom as standard default for crystal-sharp retail barcodes
+        // (Prevents holding phone too close (<10 cm) which causes optical macro blur)
+        setTimeout(() => {
+            this.setZoom(1.5);
+        }, 250);
+    }
+
+    async setZoom(level) {
+        this.currentZoom = level;
+        if (this.videoTrack && this.supportsHardwareZoom) {
+            const caps = this.videoTrack.getCapabilities ? this.videoTrack.getCapabilities() : {};
+            const minZ = caps.zoom?.min || 1;
+            const maxZ = caps.zoom?.max || 5;
+            const targetZ = Math.min(maxZ, Math.max(minZ, level));
+            try {
+                await this.videoTrack.applyConstraints({
+                    advanced: [{ zoom: targetZ }]
+                });
+            } catch (e) {
+                console.warn('Hardware zoom failed, using CSS fallback:', e);
+                this.applyCssZoom(level);
+            }
+        } else {
+            this.applyCssZoom(level);
+        }
+        this.updateZoomUI(level);
+    }
+
+    applyCssZoom(level) {
+        const video = document.querySelector('#camera-reader-viewport video');
+        if (video) {
+            video.style.transform = level > 1 ? `scale(${level})` : 'none';
+            video.style.transformOrigin = 'center center';
+        }
+    }
+
+    updateZoomUI(level) {
+        const buttons = {
+            1.0: document.getElementById('btn-zoom-1x'),
+            1.5: document.getElementById('btn-zoom-15x'),
+            2.0: document.getElementById('btn-zoom-2x'),
+            2.5: document.getElementById('btn-zoom-25x'),
+        };
+        Object.keys(buttons).forEach(k => {
+            const btn = buttons[k];
+            if (!btn) return;
+            const isCurrent = Math.abs(parseFloat(k) - level) < 0.25;
+            if (isCurrent) {
+                btn.className = 'px-2 py-0.5 text-xs font-bold rounded-lg bg-emerald-500 text-slate-950 font-black shadow-xs transition active-press';
+            } else {
+                btn.className = 'px-2 py-0.5 text-xs font-bold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition active-press';
+            }
+        });
     }
 
     handleDecoded(code) {
@@ -196,7 +409,7 @@ class CameraScannerController {
         textElem.innerText = display;
         banner.classList.remove('hidden');
 
-        // Hide feedback banner after 2.5s
+        // Hide feedback banner after 2.2s
         clearTimeout(this._feedbackTimer);
         this._feedbackTimer = setTimeout(() => {
             banner.classList.add('hidden');
@@ -303,6 +516,7 @@ class CameraScannerController {
                 console.warn('Error stopping scanner:', e);
             }
         }
+        this.videoTrack = null;
         this.isScanning = false;
         this.torchOn = false;
     }

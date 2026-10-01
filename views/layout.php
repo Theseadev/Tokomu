@@ -535,6 +535,10 @@
                 </div>
             </div>
             <div class="flex items-center space-x-1.5">
+                <!-- Refocus button -->
+                <button id="btn-camera-refocus" onclick="window.cameraScanner.refocus()" class="p-2 rounded-xl bg-white/10 hover:bg-emerald-500/30 text-white transition active-press" title="Fokus Ulang Lensa Kamera">
+                    <i data-lucide="crosshair" class="w-4 h-4"></i>
+                </button>
                 <!-- Torch / Flashlight button -->
                 <button id="btn-camera-torch" onclick="window.cameraScanner.toggleTorch()" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition active-press" title="Nyalakan Lampu / Flash">
                     <i data-lucide="zap" class="w-4 h-4"></i>
@@ -552,25 +556,46 @@
 
         <!-- Scanner Viewfinder Box -->
         <div class="relative flex-1 flex flex-col items-center justify-center overflow-hidden px-4">
-            <!-- html5-qrcode video viewport container -->
-            <div id="camera-reader-viewport" class="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative border border-emerald-500/30 bg-black min-h-[220px]">
+            <!-- html5-qrcode video viewport container with Tap-to-Focus -->
+            <div id="camera-reader-viewport" onclick="window.cameraScanner.handleTapToFocus(event)" class="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative border-2 border-emerald-500/40 bg-black min-h-[220px] cursor-pointer" title="Ketuk untuk memfokuskan lensa">
                 <!-- Video stream rendered dynamically -->
             </div>
 
             <!-- Scanning Reticle with Animated Laser Line -->
-            <div id="camera-scan-overlay" class="absolute pointer-events-none w-72 h-44 rounded-2xl shadow-[0_0_24px_rgba(16,185,129,0.25)] flex flex-col justify-between p-2">
+            <div id="camera-scan-overlay" onclick="window.cameraScanner.handleTapToFocus(event)" class="absolute cursor-pointer w-72 h-44 rounded-2xl shadow-[0_0_24px_rgba(16,185,129,0.25)] flex flex-col justify-between p-2">
                 <!-- Top Corner Accents -->
-                <div class="flex justify-between">
+                <div class="flex justify-between pointer-events-none">
                     <div class="w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl shadow-xs"></div>
                     <div class="w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl shadow-xs"></div>
                 </div>
                 <!-- Animated Sweeping Laser Line -->
-                <div class="animate-laser h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399]"></div>
+                <div class="animate-laser h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] pointer-events-none"></div>
                 <!-- Bottom Corner Accents -->
-                <div class="flex justify-between">
+                <div class="flex justify-between pointer-events-none">
                     <div class="w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl shadow-xs"></div>
                     <div class="w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-xl shadow-xs"></div>
                 </div>
+            </div>
+
+            <!-- Focus and Zoom Quick Controls -->
+            <div class="w-full max-w-sm flex items-center justify-between gap-2 mt-2.5 z-10">
+                <div id="camera-zoom-bar" class="flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-xl px-2 py-1">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-0.5">Zoom:</span>
+                    <button type="button" onclick="window.cameraScanner.setZoom(1.0)" id="btn-zoom-1x" class="px-2 py-0.5 text-xs font-bold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition active-press">1x</button>
+                    <button type="button" onclick="window.cameraScanner.setZoom(1.5)" id="btn-zoom-15x" class="px-2 py-0.5 text-xs font-bold rounded-lg bg-emerald-500 text-slate-950 font-black transition active-press">1.5x</button>
+                    <button type="button" onclick="window.cameraScanner.setZoom(2.0)" id="btn-zoom-2x" class="px-2 py-0.5 text-xs font-bold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition active-press">2x</button>
+                    <button type="button" onclick="window.cameraScanner.setZoom(2.5)" id="btn-zoom-25x" class="px-2 py-0.5 text-xs font-bold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition active-press">2.5x</button>
+                </div>
+                <button type="button" onclick="window.cameraScanner.refocus()" class="px-2.5 py-1 bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border border-slate-800 rounded-xl text-xs font-bold flex items-center gap-1 transition active-press">
+                    <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+                    <span>Fokus</span>
+                </button>
+            </div>
+
+            <!-- Focus Assistance Tip Guide -->
+            <div class="text-center px-3 py-1 text-[11px] text-slate-400 bg-slate-900/70 rounded-xl border border-slate-800/80 flex items-center justify-center gap-1.5 max-w-sm mt-1.5 z-10">
+                <span class="text-amber-400 text-xs">💡</span>
+                <span>Jarak pas <strong>15–20 cm</strong> &bull; Ketuk layar jika buram</span>
             </div>
 
             <!-- Scan Success Feedback Banner -->

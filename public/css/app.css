@@ -147,6 +147,41 @@ body {
     max-height: 52vh !important;
     object-fit: cover !important;
     border-radius: 1rem;
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes focus-pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0;
+        border-color: #34d399;
+    }
+    30% {
+        transform: translate(-50%, -50%) scale(1.0);
+        opacity: 1;
+        border-color: #10b981;
+    }
+    75% {
+        transform: translate(-50%, -50%) scale(0.95);
+        opacity: 1;
+        border-color: #34d399;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1.0);
+        opacity: 0;
+    }
+}
+
+.camera-focus-ring {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    border: 2.5px solid #34d399;
+    border-radius: 14px;
+    pointer-events: none;
+    z-index: 50;
+    animation: focus-pulse 0.85s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    box-shadow: 0 0 16px rgba(52, 211, 153, 0.7);
 }
 
 /* Mobile Responsive Compact Optimizations */
