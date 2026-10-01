@@ -187,11 +187,9 @@ class SuperAdminController {
         }
 
         if (!self::canShellExec()) {
-            Flight::json([
-                'success' => false,
-                'output' => 'Fungsi shell_exec dinonaktifkan pada shared hosting.',
-                'message' => 'Fungsi shell_exec dinonaktifkan oleh penyedia hosting. Untuk memperbarui aplikasi, silakan upload file terbaru melalui File Manager cPanel / FTP.'
-            ], 200);
+            // Pada shared hosting tanpa shell_exec, gunakan metode pure PHP ZIP update
+            $zipResult = self::pullViaZipDownload();
+            Flight::json($zipResult);
             return;
         }
 
@@ -392,6 +390,141 @@ class SuperAdminController {
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private static function pullViaZipDownload(): array {
+        if (!class_exists('\ZipArchive')) {
+            return [
+                'success' => false,
+                'output' => "Fungsi shell_exec dan ekstensi ZipArchive dinonaktifkan pada shared hosting.\n\nSolusi Otomatis:\nGunakan GitHub Actions Auto-Deploy FTP agar setiap 'git push' otomatis terunggah ke InfinityFree tanpa perlu akses terminal!",
+                'message' => 'Ekstensi ZipArchive tidak tersedia di server hosting.'
+            ];
+        }
+
+        $appDir = realpath(__DIR__ . '/../../');
+        $zipUrl = 'https://codeload.github.com/Theseadev/Tokomu/zip/refs/heads/main';
+        $tempDir = $appDir . '/data/temp_update';
+        if (!is_dir($tempDir)) {
+            @mkdir($tempDir, 0777, true);
+        }
+        $tempZip = $tempDir . '/update_' . time() . '.zip';
+        $tempExtract = $tempDir . '/extract_' . time();
+
+        // 1. Download arsip ZIP dari GitHub via cURL atau file_get_contents
+        $zipData = false;
+        if (function_exists('curl_init')) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $zipUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Tokomu-POS-Updater');
+            curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            $zipData = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($httpCode !== 200) {
+                $zipData = false;
+            }
+        }
+
+        if (!$zipData) {
+            $context = stream_context_create([
+                'http' => [
+                    'header' => "User-Agent: Tokomu-POS-Updater\r\n",
+                    'timeout' => 40
+                ],
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
+                ]
+            ]);
+            $zipData = @file_get_contents($zipUrl, false, $context);
+        }
+
+        if (!$zipData) {
+            return [
+                'success' => false,
+                'output' => "Hosting InfinityFree membatasi download langsung skrip PHP keluar (Firewall cURL/Socket).\n\nSolusi 100% Otomatis (Rekomendasi):\nWorkflow GitHub Actions (FTP Auto-Deploy) sudah kami pasang di repo!\nSetiap kali Anda jalankan 'git push' di komputer, file di InfinityFree akan otomatis ter-update lewat FTP tanpa perlu menekan tombol apa pun di browser.",
+                'message' => 'Hosting membatasi download PHP. Gunakan GitHub Actions Auto-Deploy FTP.'
+            ];
+        }
+
+        file_put_contents($tempZip, $zipData);
+
+        // 2. Ekstrak file ZIP
+        $zip = new \ZipArchive();
+        if ($zip->open($tempZip) !== true) {
+            @unlink($tempZip);
+            return [
+                'success' => false,
+                'output' => 'Arsip update ZIP dari GitHub tidak valid atau gagal diekstrak.',
+                'message' => 'Gagal membuka file arsip update.'
+            ];
+        }
+
+        @mkdir($tempExtract, 0777, true);
+        $zip->extractTo($tempExtract);
+        $zip->close();
+        @unlink($tempZip);
+
+        // Cari folder root hasil ekstrak (misal Tokomu-main)
+        $extractedDirs = glob($tempExtract . '/*', GLOB_ONLYDIR);
+        $sourceDir = !empty($extractedDirs) ? $extractedDirs[0] : $tempExtract;
+
+        // 3. Salin berkas baru ke project (Proteksi: jangan timpa config.php, data database, atau foto uploads)
+        $excludeList = ['config.php', 'data', 'public/uploads', '.git', '.github'];
+        $updatedCount = 0;
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($sourceDir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            $subPath = substr($item->getPathname(), strlen($sourceDir) + 1);
+            $subPathNorm = str_replace('\\', '/', $subPath);
+
+            $skip = false;
+            foreach ($excludeList as $exc) {
+                if ($subPathNorm === $exc || str_starts_with($subPathNorm, $exc . '/')) {
+                    $skip = true;
+                    break;
+                }
+            }
+            if ($skip) continue;
+
+            $targetPath = $appDir . DIRECTORY_SEPARATOR . $subPath;
+            if ($item->isDir()) {
+                if (!is_dir($targetPath)) {
+                    @mkdir($targetPath, 0777, true);
+                }
+            } else {
+                @copy($item->getPathname(), $targetPath);
+                $updatedCount++;
+            }
+        }
+
+        // Bersihkan folder temp
+        self::deleteDirRecursive($tempDir);
+
+        return [
+            'success' => true,
+            'output' => "Update Berhasil!\n- Berhasil mengunduh update terbaru dari GitHub (branch main)\n- {$updatedCount} file aplikasi berhasil diperbarui\n- Database & konfigurasi toko tetap terlindungi.",
+            'latest_commit' => 'Sync GitHub Zip (' . date('d M Y H:i') . ')',
+            'message' => "Aplikasi berhasil diperbarui ({$updatedCount} file tersinkronisasi)!"
+        ];
+    }
+
+    private static function deleteDirRecursive(string $dir): void {
+        if (!is_dir($dir)) return;
+        $files = array_diff(scandir($dir), ['.', '..']);
+        foreach ($files as $file) {
+            $p = $dir . DIRECTORY_SEPARATOR . $file;
+            is_dir($p) ? self::deleteDirRecursive($p) : @unlink($p);
+        }
+        @rmdir($dir);
     }
 
     private static function getGitInfoInternal(): array {

@@ -487,6 +487,22 @@
                     </div>
                 </div>
 
+                <!-- GitHub Actions Auto-Deploy Banner -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2 text-blue-900 text-xs font-bold">
+                            <i data-lucide="zap" class="w-4 h-4 text-blue-600"></i>
+                            <span>Fitur Auto-Deploy GitHub Actions (InfinityFree)</span>
+                        </div>
+                        <p class="text-xs text-blue-700 leading-relaxed">
+                            Sudah disiapkan workflow <strong>GitHub Actions</strong>. Setiap kali Anda <code>git push origin main</code> dari laptop, file baru otomatis disinkronkan ke server InfinityFree via FTP tanpa Anda perlu klik tombol apa pun!
+                        </p>
+                    </div>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 shrink-0">
+                        ⚡ Siap Pakai
+                    </span>
+                </div>
+
                 <!-- Git Setup Box Form (Visible if no remote URL yet) -->
                 <div id="git-setup-box" class="<?= $git['is_git'] && !empty($git['remote_url']) ? 'hidden' : '' ?> bg-amber-50/70 border border-amber-200/80 p-4 sm:p-5 rounded-2xl space-y-3">
                     <div class="flex items-center gap-2 text-amber-800 text-xs font-bold">

@@ -1,0 +1,33 @@
+name: 🚀 Auto Deploy ke InfinityFree
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  web-deploy:
+    name: 🌐 Sync File ke InfinityFree Hosting
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🚚 Ambil Kode Terbaru dari GitHub
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 📂 Upload File yang Berubah via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftpupload.net
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: htdocs/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github*/**
+            **/data/warung.db
+            **/data/*.db
+            **/data/backups/**
+            config.php
